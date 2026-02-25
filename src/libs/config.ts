@@ -12,7 +12,7 @@ export const availableWatchSorts = [
 	'watchPrice',
 ];
 
-export const availableWatchOptions = ['watchBarter', 'watchRent'];
+export const availableWatchOptions = ['watchBarter', 'watchRent', 'watchBestSeller'];
 
 export const availableSellerSorts = [
 	'createdAt',

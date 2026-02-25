@@ -5,7 +5,6 @@ export enum WatchType {
 	SPORT = 'SPORT',
 	CLASSIC = 'CLASSIC',
 	DRESS = 'DRESS',
-	DIVING = 'DIVING',
 	SMART = 'SMART',
 }
 registerEnumType(WatchType, {

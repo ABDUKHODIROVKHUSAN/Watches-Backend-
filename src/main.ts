@@ -11,7 +11,8 @@ async function bootstrap() {
 	app.useGlobalInterceptors(new LoggingInterceptor());
 	app.enableCors({ origin: true, credentials: true });
 
-	app.use(graphqlUploadExpress({ maxFileSize: 1500000, maxFiles: 10 }));
+	// 5MB per file; oversized uploads return GraphQL error without crashing server.
+	app.use(graphqlUploadExpress({ maxFileSize: 5000000, maxFiles: 10 }));
 	app.use('/uploads', express.static('./uploads'));
 
 	await app.listen(process.env.PORT_API ?? 3000);

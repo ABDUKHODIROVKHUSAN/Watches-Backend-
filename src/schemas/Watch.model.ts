@@ -50,6 +50,11 @@ const WatchSchema = new Schema(
 			default: false,
 		},
 
+		watchBestSeller: {
+			type: Boolean,
+			default: false,
+		},
+
 		watchViews: {
 			type: Number,
 			default: 0,

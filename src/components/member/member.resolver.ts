@@ -129,10 +129,15 @@ export class MemberResolver {
 		const stream = createReadStream();
 
 		const result = await new Promise((resolve, reject) => {
-			stream
-				.pipe(createWriteStream(url))
-				.on('finish', async () => resolve(true))
-				.on('error', () => reject(false));
+			const writer = createWriteStream(url);
+			const onError = () => reject(false);
+
+			// Handle source stream errors (e.g., file truncated / oversize)
+			stream.on('error', onError);
+			writer.on('error', onError);
+			writer.on('finish', async () => resolve(true));
+
+			stream.pipe(writer);
 		});
 		if (!result) throw new Error(Message.UPLOAD_FAILED);
 
@@ -161,10 +166,14 @@ export class MemberResolver {
 				const stream = createReadStream();
 
 				const result = await new Promise((resolve, reject) => {
-					stream
-						.pipe(createWriteStream(url))
-						.on('finish', () => resolve(true))
-						.on('error', () => reject(false));
+					const writer = createWriteStream(url);
+					const onError = () => reject(false);
+
+					stream.on('error', onError);
+					writer.on('error', onError);
+					writer.on('finish', () => resolve(true));
+
+					stream.pipe(writer);
 				});
 				if (!result) throw new Error(Message.UPLOAD_FAILED);
 

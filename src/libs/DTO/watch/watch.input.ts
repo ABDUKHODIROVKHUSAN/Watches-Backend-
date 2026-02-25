@@ -41,6 +41,10 @@ export class WatchInput {
 	@Field(() => Boolean, { nullable: true })
 	watchRent?: boolean;
 
+	@IsOptional()
+	@Field(() => Boolean, { nullable: true })
+	watchBestSeller?: boolean;
+
 	memberId?: ObjectId;
 
 	@IsOptional()

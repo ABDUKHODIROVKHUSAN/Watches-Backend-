@@ -36,6 +36,9 @@ export class Watch {
 	@Field(() => Boolean)
 	watchRent: boolean;
 
+	@Field(() => Boolean, { nullable: true })
+	watchBestSeller?: boolean;
+
 	@Field(() => String)
 	watchViews: number;
 
