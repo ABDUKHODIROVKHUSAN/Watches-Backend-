@@ -1,5 +1,5 @@
 import { UseGuards } from '@nestjs/common';
-import { Args, Query, Resolver } from '@nestjs/graphql';
+import { Args, ID, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { AIService } from './ai.service';
 import { WatchAIInsights } from '../../libs/DTO/ai/ai';
 import { WatchesService } from '../watches/watches.service';
@@ -7,6 +7,8 @@ import { shapeIntoMongoObjectId } from '../../libs/config';
 import { WithoutGuard } from '../auth/guards/without.guard';
 import { AuthMember } from '../auth/decorators/authMember.decorator';
 import { ObjectId } from 'mongoose';
+import { Watch } from '../../libs/DTO/watch/watch';
+import { WatchComparison, WatchFinderInput } from '../../libs/DTO/ai/ai-help.stub';
 
 @Resolver()
 export class AIResolver {
@@ -25,5 +27,62 @@ export class AIResolver {
 		const watchId = shapeIntoMongoObjectId(input);
 		const watch = await this.watchesService.getWatch(memberId, watchId);
 		return await this.aiService.getWatchInsights(watch);
+	}
+
+	@UseGuards(WithoutGuard)
+	@Query(() => WatchAIInsights)
+	public async getWatchBrandAIInsights(
+		@Args('brand') brand: string,
+	): Promise<WatchAIInsights> {
+		console.log('Query: getWatchBrandAIInsights');
+		const cleanBrand = (brand || '').trim();
+		const featuredWatch = await this.watchesService.getFeaturedWatchByBrand(cleanBrand);
+
+		if (featuredWatch) {
+			return await this.aiService.getWatchInsights(featuredWatch);
+		}
+
+		return await this.aiService.getBrandInsights(cleanBrand);
+	}
+
+	@UseGuards(WithoutGuard)
+	@Query(() => [Watch])
+	public async watchRecommendations(
+		@Args('input') _input: WatchFinderInput,
+	): Promise<Watch[]> {
+		console.log('Query: watchRecommendations');
+		// TODO: connect to real recommendation engine and retrieval logic.
+		return [];
+	}
+
+	@UseGuards(WithoutGuard)
+	@Query(() => WatchComparison)
+	public async compareWatches(
+		@Args({ name: 'ids', type: () => [ID] }) ids: string[],
+	): Promise<WatchComparison> {
+		console.log('Query: compareWatches');
+		const [leftId = '', rightId = ''] = ids;
+		// TODO: fetch actual watch specs and build real comparison matrix.
+		return {
+			leftId,
+			rightId,
+			rows: [
+				{ metric: 'Movement', leftValue: 'Automatic', rightValue: 'Automatic' },
+				{ metric: 'Case Size', leftValue: '40 mm', rightValue: '42 mm' },
+				{ metric: 'Water Resistance', leftValue: '100m', rightValue: '300m' },
+				{ metric: 'Power Reserve', leftValue: '70h', rightValue: '55h' },
+				{ metric: 'Price', leftValue: '$10,000', rightValue: '$7,200' },
+			],
+		};
+	}
+
+	@UseGuards(WithoutGuard)
+	@Mutation(() => String)
+	public async aiChat(
+		@Args('message') message: string,
+	): Promise<string> {
+		console.log('Mutation: aiChat');
+		// TODO: connect to conversational AI orchestration.
+		return `AI placeholder response: ${message}`;
 	}
 }

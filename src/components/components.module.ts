@@ -5,6 +5,7 @@ import { WatchesModule } from './watches/watches.module';
 import { LikeModule } from './like/like.module';
 import { ViewModule } from './view/view.module';
 import { AIModule } from './ai/ai.module';
+import { OrderModule } from './order/order.module';
 
 @Module({
 	imports: [
@@ -14,6 +15,7 @@ import { AIModule } from './ai/ai.module';
 		LikeModule,
 		ViewModule,
 		AIModule,
+		OrderModule,
 	],
 })
 export class ComponentsModule {}

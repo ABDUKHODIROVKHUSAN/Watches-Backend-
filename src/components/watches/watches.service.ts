@@ -79,6 +79,20 @@ export class WatchesService {
 		return targetWatch;
 	}
 
+	public async getFeaturedWatchByBrand(brand: string): Promise<Watch | null> {
+		const normalized = (brand || '').trim().toUpperCase().replace(/\s+/g, '_');
+		const brandRegex = new RegExp((brand || '').trim(), 'i');
+
+		return await this.watchModel
+			.findOne({
+				watchStatus: WatchStatus.ACTIVE,
+				$or: [{ watchBrand: normalized }, { watchBrand: { $regex: brandRegex } }, { watchTitle: { $regex: brandRegex } }],
+			})
+			.sort({ watchLikes: -1, watchViews: -1, createdAt: -1 })
+			.lean()
+			.exec();
+	}
+
 	public async watchStatsEditor(input: StatisticModifier): Promise<Watch> {
 		const { _id, targetKey, modifier } = input;
 
@@ -88,26 +102,42 @@ export class WatchesService {
 	}
 
 	public async updateWatch(memberId: ObjectId, input: WatchUpdate): Promise<Watch> {
-		let { watchStatus, soldAt, deletedAt } = input;
+		if (input.watchStatus === WatchStatus.DELETE) {
+			throw new BadRequestException(Message.NOT_ALLOWED_REQUEST);
+		}
 
 		const search: T = {
 			_id: input._id,
 			memberId: memberId,
-			watchStatus: WatchStatus.ACTIVE,
+			watchStatus: { $ne: WatchStatus.DELETE },
 		};
 
-		if (watchStatus === WatchStatus.SOLD) soldAt = moment().toDate();
-		else if (watchStatus === WatchStatus.DELETE) deletedAt = moment().toDate();
+		const currentWatch = await this.watchModel.findOne(search).lean().exec();
+		if (!currentWatch) throw new InternalServerErrorException(Message.UPDATE_FAILED);
 
-		const result = await this.watchModel.findOneAndUpdate(search, input, { new: true }).exec();
+		const nextStatus = input.watchStatus ?? currentWatch.watchStatus;
+		const updatePayload: T = { ...input };
 
+		if (currentWatch.watchStatus !== WatchStatus.SOLD && nextStatus === WatchStatus.SOLD) {
+			updatePayload.soldAt = moment().toDate();
+		} else if (currentWatch.watchStatus === WatchStatus.SOLD && nextStatus !== WatchStatus.SOLD) {
+			updatePayload.soldAt = null;
+		}
+
+		const result = await this.watchModel.findOneAndUpdate(search, updatePayload, { new: true }).exec();
 		if (!result) throw new InternalServerErrorException(Message.UPDATE_FAILED);
 
-		if (soldAt || deletedAt) {
+		if (currentWatch.watchStatus !== WatchStatus.SOLD && nextStatus === WatchStatus.SOLD) {
 			await this.memberService.memberStatsEditor({
 				_id: memberId,
 				targetKey: 'memberWatches',
 				modifier: -1,
+			});
+		} else if (currentWatch.watchStatus === WatchStatus.SOLD && nextStatus !== WatchStatus.SOLD) {
+			await this.memberService.memberStatsEditor({
+				_id: memberId,
+				targetKey: 'memberWatches',
+				modifier: 1,
 			});
 		}
 

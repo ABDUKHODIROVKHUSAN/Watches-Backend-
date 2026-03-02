@@ -14,6 +14,7 @@ registerEnumType(WatchType, {
 export enum WatchStatus {
 	ACTIVE = 'ACTIVE',
 	SOLD = 'SOLD',
+	OUT_OF_STOCK = 'OUT_OF_STOCK',
 	DELETE = 'DELETE',
 }
 registerEnumType(WatchStatus, {
@@ -30,6 +31,7 @@ export enum WatchBrand {
 	BREITLING = 'BREITLING',
 	IWC = 'IWC',
 	HUBLOT = 'HUBLOT',
+	TISSOT = 'TISSOT',
 }
 registerEnumType(WatchBrand, {
 	name: 'WatchBrand',
