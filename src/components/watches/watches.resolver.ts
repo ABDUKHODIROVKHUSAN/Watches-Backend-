@@ -68,6 +68,13 @@ export class WatchesResolver {
 		return await this.watchesService.getWatches(memberId, input);
 	}
 
+	@UseGuards(WithoutGuard)
+	@Query(() => Watches)
+	public async getBestSellerWatchesRow(): Promise<Watches> {
+		console.log('Query: getBestSellerWatchesRow');
+		return await this.watchesService.getBestSellerWatchesRow();
+	}
+
 	@UseGuards(AuthGuard)
 	@Query((returns) => Watches)
 	public async getFavoriteWatches(

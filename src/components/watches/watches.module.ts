@@ -3,6 +3,8 @@ import { WatchesResolver } from './watches.resolver';
 import { WatchesService } from './watches.service';
 import { MongooseModule } from '@nestjs/mongoose';
 import WatchSchema from '../../schemas/Watch.model';
+import BestSellerSnapshotSchema from '../../schemas/BestSellerSnapshot.model';
+import BestSellerDisplayStateSchema from '../../schemas/BestSellerDisplayState.model';
 import { AuthModule } from '../auth/auth.module';
 import { ViewModule } from '../view/view.module';
 import { MemberModule } from '../member/member.module';
@@ -14,6 +16,14 @@ import { LikeModule } from '../like/like.module';
 			{
 				name: 'Watch',
 				schema: WatchSchema,
+			},
+			{
+				name: 'BestSellerSnapshot',
+				schema: BestSellerSnapshotSchema,
+			},
+			{
+				name: 'BestSellerDisplayState',
+				schema: BestSellerDisplayStateSchema,
 			},
 		]),
 		AuthModule,

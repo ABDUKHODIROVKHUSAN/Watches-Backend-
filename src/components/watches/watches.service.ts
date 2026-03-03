@@ -22,11 +22,29 @@ import { LikeService } from '../like/like.service';
 import { LikeGroup } from '../../libs/enums/like.enum';
 import { LikeInput } from '../../libs/DTO/like/like.input';
 
+const BEST_SELLER_JOB_NAME = 'hourly-best-sellers';
+
+interface BestSellerSnapshotDoc {
+	jobName: string;
+	windowEnd: Date;
+	rank: number;
+	watchId: ObjectId;
+}
+
+interface BestSellerDisplayStateDoc {
+	jobName: string;
+	displayWatchIds: ObjectId[];
+}
+
 @Injectable()
 export class WatchesService {
 	constructor(
 		@InjectModel('Watch')
 		private readonly watchModel: Model<Watch>,
+		@InjectModel('BestSellerSnapshot')
+		private readonly bestSellerSnapshotModel: Model<BestSellerSnapshotDoc>,
+		@InjectModel('BestSellerDisplayState')
+		private readonly bestSellerDisplayStateModel: Model<BestSellerDisplayStateDoc>,
 		private memberService: MemberService,
 		private viewService: ViewService,
 		private likeService: LikeService,
@@ -175,6 +193,72 @@ export class WatchesService {
 		if (!result.length) throw new InternalServerErrorException(Message.NO_DATA_FOUND);
 
 		return result[0];
+	}
+
+	public async getBestSellerWatchesRow(): Promise<Watches> {
+		const displayState = await this.bestSellerDisplayStateModel
+			.findOne({ jobName: BEST_SELLER_JOB_NAME })
+			.lean()
+			.exec();
+
+		let orderedWatchIds: ObjectId[] = displayState?.displayWatchIds ?? [];
+
+		if (!orderedWatchIds.length) {
+			const latestSnapshot = await this.bestSellerSnapshotModel
+				.findOne({ jobName: BEST_SELLER_JOB_NAME })
+				.sort({ windowEnd: -1, rank: 1 })
+				.lean()
+				.exec();
+
+			if (latestSnapshot) {
+				const topRows = await this.bestSellerSnapshotModel
+					.find({
+						jobName: BEST_SELLER_JOB_NAME,
+						windowEnd: latestSnapshot.windowEnd,
+					})
+					.sort({ rank: 1 })
+					.limit(3)
+					.lean()
+					.exec();
+
+				orderedWatchIds = topRows.map((row) => row.watchId);
+			}
+		}
+
+		if (!orderedWatchIds.length) {
+			const legacyBestSellers = await this.watchModel
+				.find({
+					watchStatus: WatchStatus.ACTIVE,
+					watchBestSeller: true,
+				})
+				.sort({ updatedAt: -1 })
+				.limit(3)
+				.lean()
+				.exec();
+
+			return {
+				list: legacyBestSellers as Watch[],
+				metaCounter: [{ total: legacyBestSellers.length }],
+			};
+		}
+
+		const watches = await this.watchModel
+			.find({
+				_id: { $in: orderedWatchIds },
+				watchStatus: WatchStatus.ACTIVE,
+			})
+			.lean()
+			.exec();
+
+		const watchMap = new Map(watches.map((watch) => [watch._id.toString(), watch]));
+		const list = orderedWatchIds
+			.map((watchId) => watchMap.get(watchId.toString()))
+			.filter((watch) => !!watch);
+
+		return {
+			list: list as Watch[],
+			metaCounter: [{ total: list.length }],
+		};
 	}
 
 	private shapeMatchQuery(match: T, input: WatchesInquiry): void {
