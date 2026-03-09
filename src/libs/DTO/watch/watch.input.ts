@@ -1,9 +1,10 @@
 import { Field, InputType, Int } from '@nestjs/graphql';
 import { IsIn, IsNotEmpty, IsOptional, Length, Min } from 'class-validator';
-import { WatchBrand, WatchStatus, WatchType } from '../../enums/watch.enum';
+import { WatchBrand, WatchLocale, WatchStatus, WatchType } from '../../enums/watch.enum';
 import { ObjectId } from 'mongoose';
 import { availableWatchOptions, availableWatchSorts } from '../../config';
 import { Direction } from '../../enums/common.enum';
+import { WatchI18nInput } from './watch.i18n';
 
 @InputType()
 export class WatchInput {
@@ -20,6 +21,10 @@ export class WatchInput {
 	@Field(() => String)
 	watchTitle: string;
 
+	@IsOptional()
+	@Field(() => WatchI18nInput, { nullable: true })
+	watchTitleI18n?: WatchI18nInput;
+
 	@IsNotEmpty()
 	@Field(() => Number)
 	watchPrice: number;
@@ -32,6 +37,10 @@ export class WatchInput {
 	@Length(5, 500)
 	@Field(() => String, { nullable: true })
 	watchDesc?: string;
+
+	@IsOptional()
+	@Field(() => WatchI18nInput, { nullable: true })
+	watchDescI18n?: WatchI18nInput;
 
 	@IsOptional()
 	@Field(() => Boolean, { nullable: true })
@@ -100,6 +109,10 @@ class WISearch {
 	@IsOptional()
 	@Field(() => String, { nullable: true })
 	text?: string;
+
+	@IsOptional()
+	@Field(() => WatchLocale, { nullable: true })
+	locale?: WatchLocale;
 }
 
 @InputType()

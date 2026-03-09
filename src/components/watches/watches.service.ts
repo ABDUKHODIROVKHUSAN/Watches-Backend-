@@ -52,6 +52,7 @@ export class WatchesService {
 
 	public async createWatch(input: WatchInput): Promise<Watch> {
 		try {
+			this.normalizeLocalizedWatchPayload(input);
 			const result = await this.watchModel.create(input);
 			await this.memberService.memberStatsEditor({
 				_id: result.memberId,
@@ -104,7 +105,14 @@ export class WatchesService {
 		return await this.watchModel
 			.findOne({
 				watchStatus: WatchStatus.ACTIVE,
-				$or: [{ watchBrand: normalized }, { watchBrand: { $regex: brandRegex } }, { watchTitle: { $regex: brandRegex } }],
+				$or: [
+					{ watchBrand: normalized },
+					{ watchBrand: { $regex: brandRegex } },
+					{ watchTitle: { $regex: brandRegex } },
+					{ 'watchTitleI18n.en': { $regex: brandRegex } },
+					{ 'watchTitleI18n.ko': { $regex: brandRegex } },
+					{ 'watchTitleI18n.uz': { $regex: brandRegex } },
+				],
 			})
 			.sort({ watchLikes: -1, watchViews: -1, createdAt: -1 })
 			.lean()
@@ -135,6 +143,7 @@ export class WatchesService {
 
 		const nextStatus = input.watchStatus ?? currentWatch.watchStatus;
 		const updatePayload: T = { ...input };
+		this.normalizeLocalizedWatchPayload(updatePayload);
 
 		if (currentWatch.watchStatus !== WatchStatus.SOLD && nextStatus === WatchStatus.SOLD) {
 			updatePayload.soldAt = moment().toDate();
@@ -270,12 +279,42 @@ export class WatchesService {
 		if (pricesRange) match.watchPrice = { $gte: pricesRange.start, $lte: pricesRange.end };
 		if (periodsRange) match.createdAt = { $gte: periodsRange.start, $lte: periodsRange.end };
 
-		if (text) match.watchTitle = { $regex: new RegExp(text, 'i') };
+		if (text) {
+			const searchRegex = new RegExp(text, 'i');
+			match['$or'] = [
+				{ watchTitle: { $regex: searchRegex } },
+				{ 'watchTitleI18n.en': { $regex: searchRegex } },
+				{ 'watchTitleI18n.ko': { $regex: searchRegex } },
+				{ 'watchTitleI18n.uz': { $regex: searchRegex } },
+			];
+		}
 		if (options) {
-			match['$or'] = options.map((ele) => {
+			const optionsQuery = options.map((ele) => {
 				return { [ele]: true };
 			});
+			if (match['$or']) {
+				match['$and'] = [{ $or: match['$or'] }, { $or: optionsQuery }];
+				delete match['$or'];
+			} else {
+				match['$or'] = optionsQuery;
+			}
 		}
+	}
+
+	private normalizeLocalizedWatchPayload(payload: T): void {
+		if (!payload) return;
+
+		const titleI18n = payload.watchTitleI18n ?? {};
+		const descI18n = payload.watchDescI18n ?? {};
+
+		if (payload.watchTitle && !titleI18n.en) titleI18n.en = payload.watchTitle;
+		if (!payload.watchTitle && titleI18n.en) payload.watchTitle = titleI18n.en;
+
+		if (payload.watchDesc && !descI18n.en) descI18n.en = payload.watchDesc;
+		if (!payload.watchDesc && descI18n.en) payload.watchDesc = descI18n.en;
+
+		if (Object.keys(titleI18n).length) payload.watchTitleI18n = titleI18n;
+		if (Object.keys(descI18n).length) payload.watchDescI18n = descI18n;
 	}
 
 	public async getFavoriteWatches(memberId: ObjectId, input: OrdinaryInquiry): Promise<Watches> {

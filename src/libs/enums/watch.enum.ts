@@ -36,3 +36,12 @@ export enum WatchBrand {
 registerEnumType(WatchBrand, {
 	name: 'WatchBrand',
 });
+
+export enum WatchLocale {
+	EN = 'en',
+	KO = 'ko',
+	UZ = 'uz',
+}
+registerEnumType(WatchLocale, {
+	name: 'WatchLocale',
+});

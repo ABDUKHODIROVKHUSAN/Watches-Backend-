@@ -3,6 +3,7 @@ import { ObjectId } from 'mongoose';
 import { WatchBrand, WatchStatus, WatchType } from '../../enums/watch.enum';
 import { Member, TotalCounter } from '../member/member';
 import { MeLiked } from '../like/like';
+import { WatchI18n } from './watch.i18n';
 
 @ObjectType()
 export class Watch {
@@ -21,6 +22,9 @@ export class Watch {
 	@Field(() => String)
 	watchTitle: string;
 
+	@Field(() => WatchI18n, { nullable: true })
+	watchTitleI18n?: WatchI18n;
+
 	@Field(() => Number)
 	watchPrice: number;
 
@@ -29,6 +33,9 @@ export class Watch {
 
 	@Field(() => String, { nullable: true })
 	watchDesc?: string;
+
+	@Field(() => WatchI18n, { nullable: true })
+	watchDescI18n?: WatchI18n;
 
 	@Field(() => Boolean)
 	watchBarter: boolean;

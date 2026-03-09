@@ -26,6 +26,12 @@ const WatchSchema = new Schema(
 			required: true,
 		},
 
+		watchTitleI18n: {
+			en: { type: String },
+			ko: { type: String },
+			uz: { type: String },
+		},
+
 		watchPrice: {
 			type: Number,
 			required: true,
@@ -38,6 +44,12 @@ const WatchSchema = new Schema(
 
 		watchDesc: {
 			type: String,
+		},
+
+		watchDescI18n: {
+			en: { type: String },
+			ko: { type: String },
+			uz: { type: String },
 		},
 
 		watchBarter: {

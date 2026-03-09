@@ -2,6 +2,7 @@ import { Field, InputType } from '@nestjs/graphql';
 import { IsNotEmpty, IsOptional, Length } from 'class-validator';
 import { WatchBrand, WatchStatus, WatchType } from '../../enums/watch.enum';
 import { ObjectId } from 'mongoose';
+import { WatchI18nInput } from './watch.i18n';
 
 @InputType()
 export class WatchUpdate {
@@ -27,6 +28,10 @@ export class WatchUpdate {
 	watchTitle?: string;
 
 	@IsOptional()
+	@Field(() => WatchI18nInput, { nullable: true })
+	watchTitleI18n?: WatchI18nInput;
+
+	@IsOptional()
 	@Field(() => Number, { nullable: true })
 	watchPrice?: number;
 
@@ -38,6 +43,10 @@ export class WatchUpdate {
 	@Length(5, 500)
 	@Field(() => String, { nullable: true })
 	watchDesc?: string;
+
+	@IsOptional()
+	@Field(() => WatchI18nInput, { nullable: true })
+	watchDescI18n?: WatchI18nInput;
 
 	@IsOptional()
 	@Field(() => Boolean, { nullable: true })
