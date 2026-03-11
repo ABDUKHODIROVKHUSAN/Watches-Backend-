@@ -18,6 +18,7 @@
     "start:api:prod": "node dist/apps/watches-api/apps/watches-api/src/main.js",
     "start:batch": "ts-node -r tsconfig-paths/register apps/watches-batch/src/main.ts",
     "start:batch:prod": "node dist/apps/watches-batch/main.js",
+    "start:prod:batch": "NODE_ENV=production node dist/apps/watches-batch/main.js",
     "lint": "eslint \"{src}/**/*.ts\" --fix",
     "test": "jest",
     "test:watch": "jest --watch",

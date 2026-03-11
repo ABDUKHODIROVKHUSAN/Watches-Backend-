@@ -1,0 +1,51 @@
+version: "3.3"
+
+services:
+  timeless-api:
+    container_name: timeless-api
+    restart: always
+    image: node:20.10.0
+    ports:
+      - 4001:3007
+    volumes:
+      - ./:/usr/src/timeless
+    working_dir: /usr/src/timeless
+
+    networks:
+      - monorepo-network
+
+      
+  # FOR PRODUCTION
+    command: bash -c "npm install && npm run build && npm run start:prod"
+
+  timeless-batch:
+    container_name: timeless-batch
+    restart: unless-stopped
+    image: node:20.10.0
+    ports:
+      - 4002:3008
+    volumes:
+      - .:/usr/src/timeless
+    working_dir: /usr/src/timeless
+
+    networks:
+      - monorepo-network
+
+    # FOR PRODUCTION
+    command: bash -c "npm install && npm run build && npm run start:prod:batch"
+
+networks:
+  monorepo-network:
+    driver: bridge
+
+
+
+
+
+
+
+
+
+    # timeless-next: locahost:4000 => container: 3000
+    # timeless-api: locahost:4001 => container: 3007
+    # timeless-batch: locahost:4002 => container: 3008
