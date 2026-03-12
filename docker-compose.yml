@@ -1,38 +1,42 @@
 version: "3.3"
 
 services:
-  timeless-api:
-    container_name: timeless-api
+  watches-api:
+    container_name: watches-api
     restart: always
     image: node:20.10.0
+    environment:
+      - NODE_ENV=production
     ports:
-      - 4001:3007
+      - 4001:3009
     volumes:
-      - ./:/usr/src/timeless
-    working_dir: /usr/src/timeless
+      - ./:/usr/src/watches
+    working_dir: /usr/src/watches
 
     networks:
       - monorepo-network
 
       
   # FOR PRODUCTION
-    command: bash -c "npm install && npm run build && npm run start:prod"
+    command: bash -c "npm install --include=dev && npm run build:api && npm run start:api:prod"
 
-  timeless-batch:
-    container_name: timeless-batch
+  watches-batch:
+    container_name: watches-batch
     restart: unless-stopped
     image: node:20.10.0
+    environment:
+      - NODE_ENV=production
     ports:
-      - 4002:3008
+      - 4002:3001
     volumes:
-      - .:/usr/src/timeless
-    working_dir: /usr/src/timeless
+      - .:/usr/src/watches
+    working_dir: /usr/src/watches
 
     networks:
       - monorepo-network
 
     # FOR PRODUCTION
-    command: bash -c "npm install && npm run build && npm run start:prod:batch"
+    command: bash -c "npm install --include=dev && npm run build:batch && npm run start:batch:prod"
 
 networks:
   monorepo-network:
@@ -47,5 +51,5 @@ networks:
 
 
     # timeless-next: locahost:4000 => container: 3000
-    # timeless-api: locahost:4001 => container: 3007
-    # timeless-batch: locahost:4002 => container: 3008
+    # watches-api: localhost:4001 => container: 3009
+    # watches-batch: localhost:4002 => container: 3001
