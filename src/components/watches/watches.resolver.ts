@@ -18,13 +18,13 @@ import { WithoutGuard } from '../auth/guards/without.guard';
 import { shapeIntoMongoObjectId } from '../../libs/config';
 import { WatchUpdate } from '../../libs/DTO/watch/watch.update';
 import { AuthGuard } from '../auth/guards/auth.guard';
+import { ApprovedSellerGuard } from '../auth/guards/approved-seller.guard';
 
 @Resolver()
 export class WatchesResolver {
 	constructor(private readonly watchesService: WatchesService) {}
 
-	@Roles(MemberType.AGENT)
-	@UseGuards(RolesGuard)
+	@UseGuards(ApprovedSellerGuard)
 	@Mutation(() => Watch)
 	public async createWatch(
 		@Args('input') input: WatchInput,
@@ -46,8 +46,7 @@ export class WatchesResolver {
 		return await this.watchesService.getWatch(memberId, watchId);
 	}
 
-	@Roles(MemberType.AGENT)
-	@UseGuards(RolesGuard)
+	@UseGuards(ApprovedSellerGuard)
 	@Mutation(() => Watch)
 	public async updateWatch(
 		@Args('input') input: WatchUpdate,
@@ -95,8 +94,7 @@ export class WatchesResolver {
 		return await this.watchesService.getVisitedWatches(memberId, input);
 	}
 
-	@Roles(MemberType.AGENT)
-	@UseGuards(RolesGuard)
+	@UseGuards(ApprovedSellerGuard)
 	@Query((returns) => Watches)
 	public async getSellerWatches(
 		@Args('input') input: SellerWatchesInquiry,

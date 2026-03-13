@@ -52,6 +52,22 @@ const WatchSchema = new Schema(
 			uz: { type: String },
 		},
 
+		strapMaterial: {
+			type: String,
+		},
+
+		caseMaterial: {
+			type: String,
+		},
+
+		dialColor: {
+			type: String,
+		},
+
+		strapColor: {
+			type: String,
+		},
+
 		watchBarter: {
 			type: Boolean,
 			default: false,

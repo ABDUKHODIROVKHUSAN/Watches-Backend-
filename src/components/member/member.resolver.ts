@@ -14,11 +14,29 @@ import { getSerialForImage, shapeIntoMongoObjectId, validMimeTypes } from '../..
 import { WithoutGuard } from '../auth/guards/without.guard';
 import { GraphQLUpload, FileUpload } from 'graphql-upload';
 import { createWriteStream } from 'fs';
+import * as fs from 'fs';
+import * as path from 'path';
 import { Message } from '../../libs/enums/common.enum';
 
 @Resolver()
 export class MemberResolver {
 	constructor(private readonly memberService: MemberService) {}
+
+	private sanitizeTarget(target: string): string {
+		// Prevent path traversal and keep uploads inside the expected root.
+		return String(target || '')
+			.replace(/[^\w-]/g, '')
+			.trim();
+	}
+
+	private ensureTargetDir(target: string): { targetDir: string; publicTarget: string } {
+		const safeTarget = this.sanitizeTarget(target);
+		if (!safeTarget) throw new Error(Message.UPLOAD_FAILED);
+
+		const targetDir = path.resolve(process.cwd(), 'uploads', safeTarget);
+		if (!fs.existsSync(targetDir)) fs.mkdirSync(targetDir, { recursive: true });
+		return { targetDir, publicTarget: safeTarget };
+	}
 
 	@Mutation(() => Member)
 	public async signup(@Args('input') input: MemberInput): Promise<Member> {
@@ -109,6 +127,32 @@ export class MemberResolver {
 		return await this.memberService.updateMemberByAdmin(input);
 	}
 
+	@Roles(MemberType.ADMIN)
+	@UseGuards(RolesGuard)
+	@Query(() => [Member])
+	public async getSellerRequests(): Promise<Member[]> {
+		console.log('Query: getSellerRequests');
+		return await this.memberService.getPendingSellerRequests();
+	}
+
+	@Roles(MemberType.ADMIN)
+	@UseGuards(RolesGuard)
+	@Mutation(() => Member)
+	public async approveSeller(@Args('userId') userId: string): Promise<Member> {
+		console.log('Mutation: approveSeller');
+		const targetId = shapeIntoMongoObjectId(userId);
+		return await this.memberService.approveSeller(targetId);
+	}
+
+	@Roles(MemberType.ADMIN)
+	@UseGuards(RolesGuard)
+	@Mutation(() => Member)
+	public async rejectSeller(@Args('userId') userId: string): Promise<Member> {
+		console.log('Mutation: rejectSeller');
+		const targetId = shapeIntoMongoObjectId(userId);
+		return await this.memberService.rejectSeller(targetId);
+	}
+
 	/** Uploader **/
 
 	@UseGuards(AuthGuard)
@@ -124,12 +168,14 @@ export class MemberResolver {
 		const validMime = validMimeTypes.includes(mimetype);
 		if (!validMime) throw new Error(Message.PROVIDE_ALLOWED_FORMAT);
 
+		const { targetDir, publicTarget } = this.ensureTargetDir(String(target));
 		const imageName = getSerialForImage(filename);
-		const url = `uploads/${target}/${imageName}`;
+		const url = `uploads/${publicTarget}/${imageName}`;
+		const destination = path.join(targetDir, imageName);
 		const stream = createReadStream();
 
 		const result = await new Promise((resolve, reject) => {
-			const writer = createWriteStream(url);
+			const writer = createWriteStream(destination);
 			const onError = () => reject(false);
 
 			// Handle source stream errors (e.g., file truncated / oversize)
@@ -161,12 +207,14 @@ export class MemberResolver {
 				const validMime = validMimeTypes.includes(mimetype);
 				if (!validMime) throw new Error(Message.PROVIDE_ALLOWED_FORMAT);
 
+				const { targetDir, publicTarget } = this.ensureTargetDir(String(target));
 				const imageName = getSerialForImage(filename);
-				const url = `uploads/${target}/${imageName}`;
+				const url = `uploads/${publicTarget}/${imageName}`;
+				const destination = path.join(targetDir, imageName);
 				const stream = createReadStream();
 
 				const result = await new Promise((resolve, reject) => {
-					const writer = createWriteStream(url);
+					const writer = createWriteStream(destination);
 					const onError = () => reject(false);
 
 					stream.on('error', onError);

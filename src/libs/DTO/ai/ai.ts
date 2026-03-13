@@ -1,4 +1,4 @@
-import { Field, ObjectType } from '@nestjs/graphql';
+import { Field, ObjectType, registerEnumType } from '@nestjs/graphql';
 
 @ObjectType()
 export class CelebrityWearer {
@@ -43,4 +43,26 @@ export class WatchAIInsights {
 
 	@Field(() => String)
 	summary: string;
+}
+
+export enum AIActionType {
+	NONE = 'NONE',
+	OPEN_PAGE = 'OPEN_PAGE',
+}
+
+registerEnumType(AIActionType, { name: 'AIActionType' });
+
+@ObjectType()
+export class AIChatResponse {
+	@Field(() => String)
+	reply: string;
+
+	@Field(() => AIActionType, { nullable: true })
+	actionType?: AIActionType;
+
+	@Field(() => String, { nullable: true })
+	actionTarget?: string;
+
+	@Field(() => [String], { nullable: true })
+	recommendedWatchIds?: string[];
 }

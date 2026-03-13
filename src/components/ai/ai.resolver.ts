@@ -1,7 +1,7 @@
 import { UseGuards } from '@nestjs/common';
 import { Args, ID, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { AIService } from './ai.service';
-import { WatchAIInsights } from '../../libs/DTO/ai/ai';
+import { AIChatResponse, WatchAIInsights } from '../../libs/DTO/ai/ai';
 import { WatchesService } from '../watches/watches.service';
 import { shapeIntoMongoObjectId } from '../../libs/config';
 import { WithoutGuard } from '../auth/guards/without.guard';
@@ -9,6 +9,7 @@ import { AuthMember } from '../auth/decorators/authMember.decorator';
 import { ObjectId } from 'mongoose';
 import { Watch } from '../../libs/DTO/watch/watch';
 import { WatchComparison, WatchFinderInput } from '../../libs/DTO/ai/ai-help.stub';
+import { FileUpload, GraphQLUpload } from 'graphql-upload';
 
 @Resolver()
 export class AIResolver {
@@ -77,12 +78,23 @@ export class AIResolver {
 	}
 
 	@UseGuards(WithoutGuard)
-	@Mutation(() => String)
+	@Mutation(() => AIChatResponse)
 	public async aiChat(
 		@Args('message') message: string,
-	): Promise<string> {
+		@Args('locale', { type: () => String, nullable: true }) locale?: string,
+	): Promise<AIChatResponse> {
 		console.log('Mutation: aiChat');
-		// TODO: connect to conversational AI orchestration.
-		return `AI placeholder response: ${message}`;
+		return await this.aiService.aiChat(message, locale || 'en');
+	}
+
+	@UseGuards(WithoutGuard)
+	@Mutation(() => [Watch])
+	public async visualSearchWatches(
+		@Args({ name: 'file', type: () => GraphQLUpload })
+		file: FileUpload,
+		@Args('locale', { type: () => String, nullable: true }) locale?: string,
+	): Promise<Watch[]> {
+		console.log('Mutation: visualSearchWatches');
+		return await this.aiService.visualSearchWatches(file, locale || 'en');
 	}
 }

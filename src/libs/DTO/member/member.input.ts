@@ -1,6 +1,6 @@
 import { Field, InputType, Int } from '@nestjs/graphql';
-import { IsIn, IsNotEmpty, IsOptional, Length, Min } from 'class-validator';
-import { MemberAuthType, MemberStatus, MemberType } from '../../enums/member.enum';
+import { IsEmail, IsIn, IsNotEmpty, IsOptional, Length, Min } from 'class-validator';
+import { MemberAuthType, MemberStatus, MemberType, SellerStatus } from '../../enums/member.enum';
 import { availableSellerSorts, availableMemberSorts } from '../../config';
 import { Direction } from '../../enums/common.enum';
 
@@ -21,12 +21,21 @@ export class MemberInput {
 	memberPhone: string;
 
 	@IsOptional()
+	@IsEmail()
+	@Field(() => String, { nullable: true })
+	memberEmail?: string;
+
+	@IsOptional()
 	@Field(() => MemberType, { nullable: true })
 	memberType?: MemberType;
 
 	@IsOptional()
 	@Field(() => MemberAuthType, { nullable: true })
 	memberAuthType?: MemberAuthType;
+
+	@IsOptional()
+	@Field(() => Boolean, { nullable: true })
+	requestSellerAccess?: boolean;
 }
 
 @InputType()
@@ -47,6 +56,10 @@ class SISearch {
 	@IsOptional()
 	@Field(() => String, { nullable: true })
 	text?: string;
+
+	@IsOptional()
+	@Field(() => SellerStatus, { nullable: true })
+	sellerStatus?: SellerStatus;
 }
 
 @InputType()
@@ -88,6 +101,10 @@ class MISearch {
 	@IsOptional()
 	@Field(() => String, { nullable: true })
 	text?: string;
+
+	@IsOptional()
+	@Field(() => SellerStatus, { nullable: true })
+	sellerStatus?: SellerStatus;
 }
 
 @InputType()

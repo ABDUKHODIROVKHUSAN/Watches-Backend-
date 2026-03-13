@@ -7,6 +7,7 @@ import { AuthModule } from '../auth/auth.module';
 import { ViewModule } from '../view/view.module';
 import { LikeModule } from '../like/like.module';
 import FollowSchema from '../../schemas/Follow.model';
+import { MemberAdminController } from './member-admin.controller';
 
 @Module({
 	imports: [
@@ -16,6 +17,7 @@ import FollowSchema from '../../schemas/Follow.model';
 		ViewModule,
 		LikeModule,
 	],
+	controllers: [MemberAdminController],
 	providers: [MemberResolver, MemberService],
 	exports: [MemberService],
 })

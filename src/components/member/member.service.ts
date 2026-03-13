@@ -4,7 +4,7 @@ import { Model, ObjectId } from 'mongoose';
 import { Member, Members } from '../../libs/DTO/member/member';
 import { LoginInput, MemberInput, MembersInquiry, SellersInquiry } from '../../libs/DTO/member/member.input';
 import { Direction, Message } from '../../libs/enums/common.enum';
-import { MemberStatus, MemberType } from '../../libs/enums/member.enum';
+import { MemberStatus, MemberType, SellerStatus, UserRole } from '../../libs/enums/member.enum';
 import { AuthService } from '../auth/auth.service';
 import { MemberUpdate } from '../../libs/DTO/member/memberUpdate';
 import { StatisticModifier, T } from '../../libs/types/common';
@@ -28,6 +28,13 @@ export class MemberService {
 	) {}
 
 	public async signup(input: MemberInput): Promise<Member> {
+		const requestSellerAccess = Boolean(input.requestSellerAccess || input.memberType === MemberType.AGENT);
+		input.memberType = MemberType.USER;
+		(input as any).role = UserRole.USER;
+		(input as any).sellerStatus = requestSellerAccess ? SellerStatus.PENDING : SellerStatus.NONE;
+		(input as any).sellerRequestedAt = requestSellerAccess ? new Date() : null;
+		delete (input as any).requestSellerAccess;
+
 		input.memberPassword = await this.authService.hashPassword(input.memberPassword);
 		try {
 			const result = await this.memberModel.create(input);
@@ -116,7 +123,8 @@ export class MemberService {
 	public async getSellers(memberId: ObjectId, input: SellersInquiry): Promise<Members> {
 		const { text } = input.search;
 		const match: T = {
-			memberType: MemberType.AGENT,
+			role: UserRole.SELLER,
+			sellerStatus: SellerStatus.APPROVED,
 			memberStatus: MemberStatus.ACTIVE,
 		};
 
@@ -177,12 +185,13 @@ export class MemberService {
 	/** ADMIN **/
 
 	public async getAllMembersByAdmin(input: MembersInquiry): Promise<Members> {
-		const { memberStatus, memberType, text } = input.search;
+		const { memberStatus, memberType, text, sellerStatus } = input.search;
 		const match: T = {};
 		const sort: T = { [input?.sort ?? 'createdAt']: input?.direction ?? Direction.DESC };
 
 		if (memberStatus) match.memberStatus = memberStatus;
 		if (memberType) match.memberType = memberType;
+		if (sellerStatus) match.sellerStatus = sellerStatus;
 		if (text) match.memberNick = { $regex: new RegExp(text, 'i') };
 		console.log('match:', match);
 
@@ -207,6 +216,48 @@ export class MemberService {
 	public async updateMemberByAdmin(input: MemberUpdate): Promise<Member> {
 		const result: Member = await this.memberModel
 			.findOneAndUpdate({ _id: input._id }, input, { new: true })
+			.exec();
+		if (!result) throw new InternalServerErrorException(Message.UPDATE_FAILED);
+		return result;
+	}
+
+	public async getPendingSellerRequests(): Promise<Member[]> {
+		return await this.memberModel
+			.find({
+				sellerStatus: SellerStatus.PENDING,
+				memberStatus: { $ne: MemberStatus.DELETE },
+			})
+			.sort({ sellerRequestedAt: 1, createdAt: 1 })
+			.exec();
+	}
+
+	public async approveSeller(userId: ObjectId): Promise<Member> {
+		const result = await this.memberModel
+			.findOneAndUpdate(
+				{ _id: userId, memberStatus: { $ne: MemberStatus.DELETE } },
+				{
+					role: UserRole.SELLER,
+					sellerStatus: SellerStatus.APPROVED,
+					memberType: MemberType.AGENT,
+				},
+				{ new: true },
+			)
+			.exec();
+		if (!result) throw new InternalServerErrorException(Message.UPDATE_FAILED);
+		return result;
+	}
+
+	public async rejectSeller(userId: ObjectId): Promise<Member> {
+		const result = await this.memberModel
+			.findOneAndUpdate(
+				{ _id: userId, memberStatus: { $ne: MemberStatus.DELETE } },
+				{
+					role: UserRole.USER,
+					sellerStatus: SellerStatus.REJECTED,
+					memberType: MemberType.USER,
+				},
+				{ new: true },
+			)
 			.exec();
 		if (!result) throw new InternalServerErrorException(Message.UPDATE_FAILED);
 		return result;

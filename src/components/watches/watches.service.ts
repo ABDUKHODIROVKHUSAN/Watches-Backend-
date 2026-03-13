@@ -119,6 +119,34 @@ export class WatchesService {
 			.exec();
 	}
 
+	public async getCatalogForAI(searchText: string = '', limit: number = 15): Promise<Watch[]> {
+		const cleanText = (searchText || '').trim();
+		const match: T = {
+			watchStatus: WatchStatus.ACTIVE,
+		};
+
+		if (cleanText) {
+			const searchRegex = new RegExp(cleanText, 'i');
+			match.$or = [
+				{ watchBrand: { $regex: searchRegex } },
+				{ watchTitle: { $regex: searchRegex } },
+				{ 'watchTitleI18n.en': { $regex: searchRegex } },
+				{ 'watchTitleI18n.ko': { $regex: searchRegex } },
+				{ 'watchTitleI18n.uz': { $regex: searchRegex } },
+			];
+		}
+
+		return await this.watchModel
+			.find(match)
+			.sort({ watchLikes: -1, watchViews: -1, createdAt: -1 })
+			.limit(Math.max(1, Math.min(limit, 200)))
+			.select(
+				'_id watchBrand watchTitle watchTitleI18n watchType watchPrice watchImages watchDesc watchLikes watchViews strapMaterial caseMaterial dialColor strapColor',
+			)
+			.lean()
+			.exec();
+	}
+
 	public async watchStatsEditor(input: StatisticModifier): Promise<Watch> {
 		const { _id, targetKey, modifier } = input;
 
@@ -263,6 +291,20 @@ export class WatchesService {
 		const list = orderedWatchIds
 			.map((watchId) => watchMap.get(watchId.toString()))
 			.filter((watch) => !!watch);
+
+		if (list.length < 3) {
+			const existingIds = new Set(list.map((watch) => watch._id.toString()));
+			const fillers = await this.watchModel
+				.find({
+					watchStatus: WatchStatus.ACTIVE,
+					_id: { $nin: Array.from(existingIds) },
+				})
+				.sort({ watchLikes: -1, watchViews: -1, createdAt: -1 })
+				.limit(3 - list.length)
+				.lean()
+				.exec();
+			list.push(...fillers);
+		}
 
 		return {
 			list: list as Watch[],

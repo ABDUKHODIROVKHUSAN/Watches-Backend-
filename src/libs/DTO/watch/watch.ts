@@ -37,6 +37,18 @@ export class Watch {
 	@Field(() => WatchI18n, { nullable: true })
 	watchDescI18n?: WatchI18n;
 
+	@Field(() => String, { nullable: true })
+	strapMaterial?: string;
+
+	@Field(() => String, { nullable: true })
+	caseMaterial?: string;
+
+	@Field(() => String, { nullable: true })
+	dialColor?: string;
+
+	@Field(() => String, { nullable: true })
+	strapColor?: string;
+
 	@Field(() => Boolean)
 	watchBarter: boolean;
 

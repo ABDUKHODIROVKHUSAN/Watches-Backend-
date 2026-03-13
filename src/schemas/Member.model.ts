@@ -1,5 +1,5 @@
 import { Schema } from 'mongoose';
-import { MemberAuthType, MemberStatus, MemberType } from '../libs/enums/member.enum';
+import { MemberAuthType, MemberStatus, MemberType, SellerStatus, UserRole } from '../libs/enums/member.enum';
 
 const MemberSchema = new Schema(
 	{
@@ -21,10 +21,32 @@ const MemberSchema = new Schema(
 			default: MemberAuthType.PHONE,
 		},
 
+		role: {
+			type: String,
+			enum: UserRole,
+			default: UserRole.USER,
+		},
+
+		sellerStatus: {
+			type: String,
+			enum: SellerStatus,
+			default: SellerStatus.NONE,
+		},
+
+		sellerRequestedAt: {
+			type: Date,
+			default: null,
+		},
+
 		memberPhone: {
 			type: String,
 			index: { unique: true, sparse: true },
 			required: true,
+		},
+
+		memberEmail: {
+			type: String,
+			index: { unique: true, sparse: true },
 		},
 
 		memberNick: {

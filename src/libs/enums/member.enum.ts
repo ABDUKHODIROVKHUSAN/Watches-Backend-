@@ -26,3 +26,22 @@ export enum MemberAuthType {
 registerEnumType(MemberAuthType, {
 	name: 'MemberAuthType',
 });
+
+export enum UserRole {
+	USER = 'user',
+	SELLER = 'seller',
+	ADMIN = 'admin',
+}
+registerEnumType(UserRole, {
+	name: 'UserRole',
+});
+
+export enum SellerStatus {
+	NONE = 'none',
+	PENDING = 'pending',
+	APPROVED = 'approved',
+	REJECTED = 'rejected',
+}
+registerEnumType(SellerStatus, {
+	name: 'SellerStatus',
+});

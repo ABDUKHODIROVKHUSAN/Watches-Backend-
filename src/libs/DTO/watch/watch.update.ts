@@ -49,6 +49,26 @@ export class WatchUpdate {
 	watchDescI18n?: WatchI18nInput;
 
 	@IsOptional()
+	@Length(2, 40)
+	@Field(() => String, { nullable: true })
+	strapMaterial?: string;
+
+	@IsOptional()
+	@Length(2, 40)
+	@Field(() => String, { nullable: true })
+	caseMaterial?: string;
+
+	@IsOptional()
+	@Length(2, 30)
+	@Field(() => String, { nullable: true })
+	dialColor?: string;
+
+	@IsOptional()
+	@Length(2, 30)
+	@Field(() => String, { nullable: true })
+	strapColor?: string;
+
+	@IsOptional()
 	@Field(() => Boolean, { nullable: true })
 	watchBarter?: boolean;
 
