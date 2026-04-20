@@ -18,5 +18,5 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
               cd /home/deployer/Watches-Backend-
-            git pull origin main
-            docker-compose up -d --build
+              git pull origin main
+              docker-compose up -d --build
