@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { RedisModule } from './redis/redis.module';
 import { ConfigModule } from '@nestjs/config';
 import { GraphQLModule } from '@nestjs/graphql';
 import { ApolloDriver } from '@nestjs/apollo';
@@ -11,6 +12,7 @@ import { T } from './libs/types/common';
 
 @Module({
 	imports: [
+		RedisModule,
 		ConfigModule.forRoot(),
 		GraphQLModule.forRoot({
 			driver: ApolloDriver,

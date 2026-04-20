@@ -9,6 +9,7 @@ import { AuthModule } from '../auth/auth.module';
 import { ViewModule } from '../view/view.module';
 import { MemberModule } from '../member/member.module';
 import { LikeModule } from '../like/like.module';
+import { RedisModule } from '../../redis/redis.module';
 
 @Module({
 	imports: [
@@ -30,6 +31,7 @@ import { LikeModule } from '../like/like.module';
 		ViewModule,
 		MemberModule,
 		LikeModule,
+		RedisModule,
 	],
 	providers: [WatchesResolver, WatchesService],
 	exports: [WatchesService],

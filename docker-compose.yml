@@ -7,17 +7,14 @@ services:
     image: node:20.10.0
     environment:
       - NODE_ENV=production
+      - REDIS_HOST=redis   # 👈 ADD HERE
     ports:
       - 4001:3009
     volumes:
       - ./:/usr/src/watches
     working_dir: /usr/src/watches
-
     networks:
       - monorepo-network
-
-      
-  # FOR PRODUCTION
     command: bash -c "npm install --include=dev && npm run build:api && npm run start:api:prod"
 
   watches-batch:
@@ -26,30 +23,21 @@ services:
     image: node:20.10.0
     environment:
       - NODE_ENV=production
+      - REDIS_HOST=redis   # 👈 ADD HERE (if batch uses Redis)
     ports:
       - 4002:3001
     volumes:
       - .:/usr/src/watches
     working_dir: /usr/src/watches
-
     networks:
       - monorepo-network
-
-    # FOR PRODUCTION
     command: bash -c "npm install --include=dev && npm run build:batch && npm run start:batch:prod"
 
-networks:
-  monorepo-network:
-    driver: bridge
-
-
-
-
-
-
-
-
-
-    # timeless-next: locahost:4000 => container: 3000
-    # watches-api: localhost:4001 => container: 3009
-    # watches-batch: localhost:4002 => container: 3001
+  redis:
+    image: redis:7
+    container_name: redis
+    restart: always
+    ports:
+      - "6379:6379"
+    networks:
+      - monorepo-network

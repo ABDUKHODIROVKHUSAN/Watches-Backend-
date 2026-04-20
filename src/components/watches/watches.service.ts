@@ -1,4 +1,6 @@
-import { BadRequestException, Injectable, InternalServerErrorException } from '@nestjs/common';
+import { BadRequestException, Injectable, InternalServerErrorException, Inject } from '@nestjs/common';
+import { RedisCacheService } from '../../redis/redis-cache.service';
+import { CacheKeys, TTL } from '../../redis/redis-cache.keys';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, ObjectId } from 'mongoose';
 import {
@@ -15,7 +17,7 @@ import { StatisticModifier, T } from '../../libs/types/common';
 import { WatchStatus } from '../../libs/enums/watch.enum';
 import { ViewService } from '../view/view.service';
 import { ViewGroup } from '../../libs/enums/view.enum';
-import * as moment from 'moment';
+import moment from 'moment';
 import { WatchUpdate } from '../../libs/DTO/watch/watch.update';
 import { lookupAuthMemberLiked, lookupMember, shapeIntoMongoObjectId } from '../../libs/config';
 import { LikeService } from '../like/like.service';
@@ -38,16 +40,15 @@ interface BestSellerDisplayStateDoc {
 
 @Injectable()
 export class WatchesService {
+	// Updated constructor:
 	constructor(
-		@InjectModel('Watch')
-		private readonly watchModel: Model<Watch>,
-		@InjectModel('BestSellerSnapshot')
-		private readonly bestSellerSnapshotModel: Model<BestSellerSnapshotDoc>,
-		@InjectModel('BestSellerDisplayState')
-		private readonly bestSellerDisplayStateModel: Model<BestSellerDisplayStateDoc>,
-		private memberService: MemberService,
-		private viewService: ViewService,
-		private likeService: LikeService,
+	@InjectModel('Watch') private readonly watchModel: Model<Watch>,
+	@InjectModel('BestSellerSnapshot') private readonly bestSellerSnapshotModel: Model<BestSellerSnapshotDoc>,
+	@InjectModel('BestSellerDisplayState') private readonly bestSellerDisplayStateModel: Model<BestSellerDisplayStateDoc>,
+	private readonly cache: RedisCacheService,   // ← replaces raw Redis
+	private memberService: MemberService,
+	private viewService: ViewService,
+	private likeService: LikeService,
 	) {}
 
 	public async createWatch(input: WatchInput): Promise<Watch> {
@@ -59,44 +60,74 @@ export class WatchesService {
 				targetKey: 'memberWatches',
 				modifier: 1,
 			});
+			await this.clearWatchesCache();
 			return result;
-		} catch (err) {
+		} catch (err: any) {
 			console.log('Error, Service.model:', err.message);
 			throw new BadRequestException(Message.CREATE_FAILED);
 		}
 	}
 
 	public async getWatch(memberId: ObjectId, watchId: ObjectId): Promise<Watch> {
-		const search: T = {
-			_id: watchId,
-			watchStatus: WatchStatus.ACTIVE,
-		};
+	const cacheKey = CacheKeys.watch(watchId);
 
-		const targetWatch: Watch = await this.watchModel.findOne(search).lean().exec();
+	// 1. Try cache first
+	let targetWatch = await this.cache.get<Watch>(cacheKey);
 
-		if (!targetWatch) throw new InternalServerErrorException(Message.NO_DATA_FOUND);
+	if (targetWatch) {
+		console.log('🔥 Cache HIT — single watch');
+		targetWatch = this.restoreSingleWatch(targetWatch);
+	} else {
+		console.log('💾 Cache MISS — fetching from DB');
 
-		if (memberId) {
-			const viewInput = { memberId: memberId, viewRefId: watchId, viewGroup: ViewGroup.WATCH };
-			const newView = await this.viewService.recordView(viewInput);
+		const search: T = { _id: watchId, watchStatus: WatchStatus.ACTIVE };
+		const fromDb = await this.watchModel.findOne(search).lean().exec();
 
-			if (newView) {
-				await this.watchStatsEditor({
-					_id: watchId,
-					targetKey: 'watchViews',
-					modifier: 1,
-				});
-				targetWatch.watchViews++;
-			}
+		if (!fromDb) throw new InternalServerErrorException(Message.NO_DATA_FOUND);
 
-			const likeInput = { memberId: memberId, likeRefId: watchId, likeGroup: LikeGroup.WATCH };
-			targetWatch.meLiked = await this.likeService.checkLikeExistence(likeInput);
+		await this.cache.set(cacheKey, fromDb, TTL.LONG);
+		targetWatch = this.restoreSingleWatch(fromDb);
+	}
+
+	// 2. Dynamic logic — never cached
+	if (memberId) {
+		const viewInput = { memberId, viewRefId: watchId, viewGroup: ViewGroup.WATCH };
+		const newView = await this.viewService.recordView(viewInput);
+
+		if (newView) {
+		await this.watchStatsEditor({ _id: watchId, targetKey: 'watchViews', modifier: 1 });
+		targetWatch.watchViews++;
 		}
 
-		targetWatch.memberData = await this.memberService.getMember(null, targetWatch.memberId);
-
-		return targetWatch;
+		const likeInput = { memberId, likeRefId: watchId, likeGroup: LikeGroup.WATCH };
+		targetWatch.meLiked = await this.likeService.checkLikeExistence(likeInput);
 	}
+
+	// 3. Always fresh member data
+	targetWatch.memberData = await this.memberService.getMember(null, targetWatch.memberId);
+
+	return targetWatch;
+}
+	private restoreSingleWatch(raw: any): Watch {
+    return {
+        ...raw,
+        // ✅ Original dates
+        createdAt: raw.createdAt ? new Date(raw.createdAt) : null,
+        updatedAt: raw.updatedAt ? new Date(raw.updatedAt) : null,
+        // ✅ The 3 missing ones from your schema
+        soldAt: raw.soldAt ? new Date(raw.soldAt) : null,
+        deletedAt: raw.deletedAt ? new Date(raw.deletedAt) : null,
+        manufacturedAt: raw.manufacturedAt ? new Date(raw.manufacturedAt) : null,
+        // ✅ memberData dates
+        memberData: raw.memberData
+            ? {
+                ...raw.memberData,
+                createdAt: raw.memberData.createdAt ? new Date(raw.memberData.createdAt) : null,
+                updatedAt: raw.memberData.updatedAt ? new Date(raw.memberData.updatedAt) : null,
+              }
+            : null,
+    };
+}
 
 	public async getFeaturedWatchByBrand(brand: string): Promise<Watch | null> {
 		const normalized = (brand || '').trim().toUpperCase().replace(/\s+/g, '_');
@@ -150,86 +181,96 @@ export class WatchesService {
 	public async watchStatsEditor(input: StatisticModifier): Promise<Watch> {
 		const { _id, targetKey, modifier } = input;
 
-		return await this.watchModel
+		const result = await this.watchModel
 			.findByIdAndUpdate(_id, { $inc: { [targetKey]: modifier } }, { new: true })
 			.exec();
-	}
 
-	public async updateWatch(memberId: ObjectId, input: WatchUpdate): Promise<Watch> {
-		if (input.watchStatus === WatchStatus.DELETE) {
-			throw new BadRequestException(Message.NOT_ALLOWED_REQUEST);
-		}
-
-		const search: T = {
-			_id: input._id,
-			memberId: memberId,
-			watchStatus: { $ne: WatchStatus.DELETE },
-		};
-
-		const currentWatch = await this.watchModel.findOne(search).lean().exec();
-		if (!currentWatch) throw new InternalServerErrorException(Message.UPDATE_FAILED);
-
-		const nextStatus = input.watchStatus ?? currentWatch.watchStatus;
-		const updatePayload: T = { ...input };
-		this.normalizeLocalizedWatchPayload(updatePayload);
-
-		if (currentWatch.watchStatus !== WatchStatus.SOLD && nextStatus === WatchStatus.SOLD) {
-			updatePayload.soldAt = moment().toDate();
-		} else if (currentWatch.watchStatus === WatchStatus.SOLD && nextStatus !== WatchStatus.SOLD) {
-			updatePayload.soldAt = null;
-		}
-
-		const result = await this.watchModel.findOneAndUpdate(search, updatePayload, { new: true }).exec();
-		if (!result) throw new InternalServerErrorException(Message.UPDATE_FAILED);
-
-		if (currentWatch.watchStatus !== WatchStatus.SOLD && nextStatus === WatchStatus.SOLD) {
-			await this.memberService.memberStatsEditor({
-				_id: memberId,
-				targetKey: 'memberWatches',
-				modifier: -1,
-			});
-		} else if (currentWatch.watchStatus === WatchStatus.SOLD && nextStatus !== WatchStatus.SOLD) {
-			await this.memberService.memberStatsEditor({
-				_id: memberId,
-				targetKey: 'memberWatches',
-				modifier: 1,
-			});
-		}
+		// ✅ Counter changed — single watch cache is now stale
+		await this.cache.del(CacheKeys.watch(_id));
 
 		return result;
 	}
+	public async updateWatch(memberId: ObjectId, input: WatchUpdate): Promise<Watch> {
+	if (input.watchStatus === WatchStatus.DELETE) {
+		throw new BadRequestException(Message.NOT_ALLOWED_REQUEST);
+	}
+
+	const search: T = {
+		_id: input._id,
+		memberId: memberId,
+		watchStatus: { $ne: WatchStatus.DELETE },
+	};
+
+	const currentWatch = await this.watchModel.findOne(search).lean().exec();
+	if (!currentWatch) throw new InternalServerErrorException(Message.UPDATE_FAILED);
+
+	const nextStatus = input.watchStatus ?? currentWatch.watchStatus;
+	const updatePayload: T = { ...input };
+	this.normalizeLocalizedWatchPayload(updatePayload);
+
+	if (currentWatch.watchStatus !== WatchStatus.SOLD && nextStatus === WatchStatus.SOLD) {
+		updatePayload.soldAt = moment().toDate();
+	} else if (currentWatch.watchStatus === WatchStatus.SOLD && nextStatus !== WatchStatus.SOLD) {
+		updatePayload.soldAt = null;
+	}
+
+	const result = await this.watchModel.findOneAndUpdate(search, updatePayload, { new: true }).exec();
+	if (!result) throw new InternalServerErrorException(Message.UPDATE_FAILED);
+
+	if (currentWatch.watchStatus !== WatchStatus.SOLD && nextStatus === WatchStatus.SOLD) {
+		await this.memberService.memberStatsEditor({ _id: memberId, targetKey: 'memberWatches', modifier: -1 });
+	} else if (currentWatch.watchStatus === WatchStatus.SOLD && nextStatus !== WatchStatus.SOLD) {
+		await this.memberService.memberStatsEditor({ _id: memberId, targetKey: 'memberWatches', modifier: 1 });
+	}
+
+	// ✅ Invalidate both the specific watch and all list caches
+	await this.cache.del(CacheKeys.watch(input._id));
+	await this.clearWatchesCache();
+
+	return result;
+	}
 
 	public async getWatches(memberId: ObjectId, input: WatchesInquiry): Promise<Watches> {
-		const match: T = { watchStatus: WatchStatus.ACTIVE };
-		const sort: T = {
-			[input.sort ?? 'createdAt']: input?.direction ?? Direction.DESC,
-		};
+	const cacheKey = CacheKeys.watchList(input);
 
-		this.shapeMatchQuery(match, input);
-		console.log('match:', match);
+	// 1. Try cache
+	const cached = await this.cache.get<Watches>(cacheKey);
+	if (cached) {
+		console.log('🔥 Cache HIT — watch list');
+		cached.list = cached.list.map((w: any) => this.restoreSingleWatch(w));
+		return cached;
+	}
 
-		const result = await this.watchModel
-			.aggregate([
-				{ $match: match },
-				{ $sort: sort },
-				{
-					$facet: {
-						list: [
-							{ $skip: (input.page - 1) * input.limit },
-							{ $limit: input.limit },
-							lookupAuthMemberLiked(memberId),
-							lookupMember,
-							{ $unwind: '$memberData' },
-						],
-						metaCounter: [{ $count: 'total' }],
-					},
-				},
-			])
-			.exec();
+	console.log('💾 Cache MISS — fetching watch list from DB');
 
-		if (!result.length) throw new InternalServerErrorException(Message.NO_DATA_FOUND);
+	// 2. Build query
+	const match: T = { watchStatus: WatchStatus.ACTIVE };
+	const sort: T = { [input.sort ?? 'createdAt']: input?.direction ?? Direction.DESC };
+	this.shapeMatchQuery(match, input);
 
-		return result[0];
+	const result = await this.watchModel.aggregate([
+		{ $match: match },
+		{ $sort: sort },
+		{
+		$facet: {
+			list: [
+			{ $skip: (input.page - 1) * input.limit },
+			{ $limit: input.limit },
+			lookupAuthMemberLiked(memberId),
+			lookupMember,
+			{ $unwind: '$memberData' },
+			],
+			metaCounter: [{ $count: 'total' }],
+		},
+		},
+	]).exec();
+
+	if (!result.length) throw new InternalServerErrorException(Message.NO_DATA_FOUND);
+
+	// 3. Cache the result
+	await this.cache.set(cacheKey, result[0], TTL.SHORT);
+
+	return result[0];
 	}
 
 	public async getBestSellerWatchesRow(): Promise<Watches> {
@@ -406,22 +447,22 @@ export class WatchesService {
 			.exec();
 		if (!target) throw new InternalServerErrorException(Message.NO_DATA_FOUND);
 
-		const input: LikeInput = {
-			memberId: memberId,
-			likeRefId: likeRefId,
-			likeGroup: LikeGroup.WATCH,
-		};
+		const input: LikeInput = { memberId, likeRefId, likeGroup: LikeGroup.WATCH };
 		const modifier: number = await this.likeService.toggleLike(input);
+
 		const result = await this.watchStatsEditor({
 			_id: likeRefId,
 			targetKey: 'watchLikes',
-			modifier: modifier,
+			modifier,
 		});
 
 		if (!result) throw new InternalServerErrorException(Message.SOMETHING_WENT_WRONG);
+
+		// ✅ Only bust the single watch — like count changed
+		await this.cache.del(CacheKeys.watch(likeRefId));
+
 		return result;
 	}
-
 	/** ADMIN **/
 
 	public async getAllWatchesByAdmin(input: AllWatchesInquiry): Promise<Watches> {
@@ -466,16 +507,19 @@ export class WatchesService {
 		else if (watchStatus === WatchStatus.DELETE) deletedAt = moment().toDate();
 
 		const result = await this.watchModel.findOneAndUpdate(search, input, { new: true }).exec();
-
 		if (!result) throw new InternalServerErrorException(Message.UPDATE_FAILED);
 
 		if (soldAt || deletedAt) {
 			await this.memberService.memberStatsEditor({
-				_id: result.memberId,
-				targetKey: 'memberWatches',
-				modifier: -1,
+			_id: result.memberId,
+			targetKey: 'memberWatches',
+			modifier: -1,
 			});
 		}
+
+		// ✅ Invalidate both the specific watch and all list caches
+		await this.cache.del(CacheKeys.watch(input._id));
+		await this.clearWatchesCache();
 
 		return result;
 	}
@@ -485,6 +529,16 @@ export class WatchesService {
 		const result = await this.watchModel.findOneAndDelete(search).exec();
 
 		if (!result) throw new InternalServerErrorException(Message.REMOVE_FAILED);
+
+		// ✅ Invalidate the specific watch AND all list caches
+		await this.cache.del(CacheKeys.watch(watchId));
+		await this.clearWatchesCache();
+
 		return result;
 	}
+
+	private async clearWatchesCache(): Promise<void> {
+		await this.cache.clearByPattern(CacheKeys.watchPattern());
+	}
+	
 }
