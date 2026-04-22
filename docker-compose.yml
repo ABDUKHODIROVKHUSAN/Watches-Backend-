@@ -7,7 +7,7 @@ services:
     image: node:20.10.0
     environment:
       - NODE_ENV=production
-      - REDIS_HOST=redis   # 👈 ADD HERE
+      - REDIS_HOST=redis
     ports:
       - 4001:3009
     volumes:
@@ -23,7 +23,7 @@ services:
     image: node:20.10.0
     environment:
       - NODE_ENV=production
-      - REDIS_HOST=redis   # 👈 ADD HERE (if batch uses Redis)
+      - REDIS_HOST=redis
     ports:
       - 4002:3001
     volumes:
@@ -40,5 +40,8 @@ services:
     ports:
       - "6379:6379"
     networks:
-      - monorepo-network:
-        driver: bridge
+      - monorepo-network    # ✅ plain string, no colon
+
+networks:
+  monorepo-network:         # ✅ driver goes here at the top level
+    driver: bridge
