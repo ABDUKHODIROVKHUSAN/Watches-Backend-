@@ -12,6 +12,7 @@ services:
       - 4001:3009
     volumes:
       - ./:/usr/src/watches
+      - uploads_data:/usr/src/watches/uploads  # ✅ ADD THIS
     working_dir: /usr/src/watches
     networks:
       - monorepo-network
@@ -28,6 +29,7 @@ services:
       - 4002:3001
     volumes:
       - .:/usr/src/watches
+      - uploads_data:/usr/src/watches/uploads  # ✅ ADD THIS
     working_dir: /usr/src/watches
     networks:
       - monorepo-network
@@ -40,8 +42,11 @@ services:
     ports:
       - "6379:6379"
     networks:
-      - monorepo-network    # ✅ plain string, no colon
+      - monorepo-network
 
 networks:
-  monorepo-network:         # ✅ driver goes here at the top level
+  monorepo-network:
     driver: bridge
+
+volumes:
+  uploads_data:          # ✅ ADD THIS SECTION AT THE BOTTOM
