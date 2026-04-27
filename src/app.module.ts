@@ -14,14 +14,19 @@ import { T } from './libs/types/common';
 	imports: [
 		RedisModule,
 		ConfigModule.forRoot(),
+
 		GraphQLModule.forRoot({
 			driver: ApolloDriver,
 			playground: true,
+
+			// ✅ KEEP THIS FALSE (since we use external middleware)
 			uploads: false,
+
 			autoSchemaFile: true,
+
 			formatError: (error: T) => {
 				const graphQLFormattedError = {
-					code: error?.extensions.code,
+					code: error?.extensions?.code,
 					message:
 						error?.extensions?.exception?.response?.message ||
 						error?.extensions?.response?.message ||
@@ -31,6 +36,7 @@ import { T } from './libs/types/common';
 				return graphQLFormattedError;
 			},
 		}),
+
 		ComponentsModule,
 		DatabaseModule,
 	],
