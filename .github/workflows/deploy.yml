@@ -19,8 +19,4 @@ jobs:
           script: |
               cd /home/deployer/Watches-Backend-
               git pull origin main
-<<<<<<< HEAD
-              docker compose up -d --build   
-=======
               docker compose up -d --build
->>>>>>> develop
